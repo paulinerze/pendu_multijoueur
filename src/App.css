@@ -1,0 +1,10 @@
+.bouton {
+  /*width: 100px;*/
+  background-color: gray
+}
+
+.center {
+  align-content: center;
+  margin-left: auto;
+  margin-right: auto
+}
