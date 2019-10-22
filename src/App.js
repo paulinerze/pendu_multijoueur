@@ -1,20 +1,26 @@
 import React, { Component } from 'react';
 import { Button } from 'react-bootstrap'
 import './App.css';
+import Canvas from "./Canvas.jsx";
 
 class App extends Component {
   constructor(props) {
     super(props);
     this.state = {
-      errors: 0,
+      errorsJ1: 0,
+      errorsJ2: 0,
       word: 'abc',
       alphabet : ["a","b","c","d","e","f","g","h","i","j","k","l","m","n","o","p","q","r","s","t","u","v","w","x","y","z"],
-      wordList : ["pochon","debaucher","jaille","wesh","tantot","embaucher","wallah","mashallah","inshallah","bismillah"],
       wordList2: [],
       usedLetters: [],
+      uselessUsedLetters: [],
+      players:['Joueur 1','Joueur 2'],
+      currentPlayer: 'Joueur 1',
       start: true,
-      nbWin: 0,
-      nbLoose: 0
+      nbWinJ1: 0,
+      nbLooseJ1: 0,
+      nbWinJ2: 0,
+      nbLooseJ2: 0
     };
     this.randomWord = this.randomWord.bind(this);
     this.incrementerrors = this.incrementerrors.bind(this);
@@ -65,18 +71,18 @@ class App extends Component {
     let out = this.deleteMultipleOcc(myarray)
     out = this.transformToLowerCase(out)
         
-    this.setState({wordList2: this.state.wordList2 = out})
+    return out
   }
 
   removeAccents(str) {
     let accents    = 'ÀÁÂÃÄÅàáâãäåÒÓÔÕÕÖØòóôõöøÈÉÊËèéêëðÇçÐÌÍÎÏìíîïÙÚÛÜùúûüÑñŠšŸÿýŽž';
     let accentsOut = "AAAAAAaaaaaaOOOOOOOooooooEEEEeeeeeCcDIIIIiiiiUUUUuuuuNnSsYyyZz";
-    str = str + ''
+    str += ''
     str = str.split('');
     let strLen = str.length;
     let i, x;
     for (i = 0; i < strLen; i++) {
-      if ((x = accents.indexOf(str[i])) != -1) {
+      if ((x = accents.indexOf(str[i])) !== -1) {
         str[i] = accentsOut[x];
       }
     }
@@ -89,35 +95,46 @@ class App extends Component {
     .then((data) => {
       this.setState({ wordList2: data.records.map(record => record.fields.type)})
     })
-    .catch(console.log)
+      
   }
 
    randomWord(){
+    let wordList = sessionStorage.getItem("wordList");
+    wordList = JSON.parse(wordList);
     let rand = 0 + Math.random() * (this.state.wordList2.length - 0);
-    console.log(rand)
-    this.setState({word: this.state.word = this.state.wordList2[Math.round(rand)]}); 
-    console.log("LEMOT ", this.state.word)
+    this.setState({word: wordList[Math.round(rand)]}); 
    }
 
 
   incrementerrors (){
-    let futureStateErrors = this.state.errors +1;
-    if(futureStateErrors > 10) this.isReadyToPlayAgain();
-    this.setState({errors: futureStateErrors});
+    console.log(this.state.currentPlayer)
+    if (this.state.currentPlayer === "Joueur 1") {
+      let futureStateErrors = this.state.errorsJ1 +1;
+      if(futureStateErrors > 9) this.isReadyToPlayAgain();
+      this.setState({errorsJ1: futureStateErrors});
+      this.setState({currentPlayer : "Joueur 2"})
+    } else {
+        let futureStateErrors = this.state.errorsJ2 +1;
+        if(futureStateErrors > 9) this.isReadyToPlayAgain();
+        this.setState({errorsJ2: futureStateErrors});
+        this.setState({currentPlayer : "Joueur 1"})
+    }
   }
 
   isReadyToPlayAgain(){
-    this.setState({start: this.state.start = true});
     if (this.state.word.length === this.state.usedLetters.length+1) {
-      this.setState({nbWin: this.state.nbWin+1});
-    } else this.setState({nbLoose: this.state.nbLoose+1});
+      this.state.currentPlayer === "Joueur 1" ? this.setState({nbWinJ1: this.state.nbWinJ1+1}) : this.setState({nbWinJ2: this.state.nbWinJ2+1})
+    } else {
+      this.state.currentPlayer === "Joueur 1" ? this.setState({nbLooseJ1: this.state.nbLooseJ1+1}) : this.setState({nbLooseJ1: this.state.nbLooseJ2+1})
+    }
+    this.setState({start: true});
   }
 
   handleAlphabetClick (letter){
     if (this.state.word.length === this.state.usedLetters.length+1){
       this.isReadyToPlayAgain();
       this.doMatch(letter);
-    } else if (this.state.errors < 12 ) {
+    } else if (this.state.errorsJ1 < 11 && this.state.errorsJ2 < 11) {
       this.doMatch(letter);
     } else {
       this.isReadyToPlayAgain();
@@ -134,7 +151,6 @@ class App extends Component {
     let l = theLetter.toString();
     if (this.state.word.includes(theLetter)){ //si le mot contient la lettre
       let nbOcc = this.state.word.match(new RegExp(theLetter,"gi")).length 
-      console.log("nb occ "+nbOcc)    
       if (!this.state.usedLetters.includes(l)) { //si la lettre n'a pas déjà été utilisée
 
         switch (nbOcc) {
@@ -154,21 +170,35 @@ class App extends Component {
             break;
         }  
       } else {
+        this.setState({uselessUsedLetters: this.state.uselessUsedLetters.concat(l)})
         this.incrementerrors();
       }
     } else {
+      this.setState({uselessUsedLetters: this.state.uselessUsedLetters.concat(l)})
       this.incrementerrors();
     }
   }
 
   handleGameManagerClick(){
-    if (this.state.nbLoose < 1 && this.state.nbWin < 1){
-      this.manageWordList();
+    if ((this.state.nbWinJ1 < 1 && this.state.nbLooseJ1 < 1) && (this.state.nbWinJ2 < 1 && this.state.nbLooseJ2 < 1) ) {
+      let wordList = this.manageWordList();
+      wordList = JSON.stringify(wordList);
+      sessionStorage.setItem("wordList",wordList);
     }
-    this.setState({start: this.state.start = false}); 
-    this.setState({errors: this.state.errors = 0});
-    this.setState({usedLetters: this.state.usedLetters = []});
+
+    this.setState({start: false}); 
+    this.setState({errorsJ1: 0});
+    this.setState({errorsJ2: 0});
+    this.setState({usedLetters: []});
+    this.setState({uselessUsedLetters: []});
     this.randomWord();
+    this.letterInput.focus();  
+  }
+
+  handleChange = ({target: {value} }) => {
+    value = value.toLowerCase();
+    this.handleAlphabetClick(value);
+    value="";
   }
 
    
@@ -177,13 +207,35 @@ class App extends Component {
     
     const GameManager = () => {
       let disableButton = !this.state.start;
-      return <Button disabled={disableButton} onClick={this.handleGameManagerClick}>{"Jouer"}</Button>
+      return <p><Button disabled={disableButton} onClick={this.handleGameManagerClick}>{"Jouer"}</Button></p>
     }
     
     const ScoreBoard = () => {
-      return <div><p>{"Nombre de victoire(s) : " + this.state.nbWin}</p>
-      <p>{"Nombre de défaite(s) : " + this.state.nbLoose}</p>
-      <p>{"Nombre d'erreurs : "+ this.state.errors}</p></div>
+      return <div>
+      <table>
+        <thead>
+          <tr>
+            <th>{"Joueur 1"}</th>
+            <th>{"Joueur 2"}</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>{"Nombre de victoire(s) joueur 1 : " + this.state.nbWinJ1}</td>
+            <td>{"Nombre de victoire(s) joueur 2 : " + this.state.nbWinJ2}</td>
+          </tr>
+          <tr>
+            <td>{"Nombre de défaite(s) joueur 1 : " + this.state.nbLooseJ1}</td>
+            <td>{"Nombre de défaite(s) joueur 2 : " + this.state.nbLooseJ2}</td>
+          </tr>
+          <tr>
+            <td>{"Nombre d'erreurs joueur 1 : "+ this.state.errorsJ1}</td>
+            <td>{"Nombre d'erreurs joueur 2 : "+ this.state.errorsJ2}</td>
+          </tr>
+        </tbody>
+      </table>
+      <p>{"C'est au tour du " + this.state.currentPlayer}</p> 
+      </div>
     }
     
     const GuessList = () => {
@@ -193,46 +245,45 @@ class App extends Component {
       )      
     }
 
-    const AlphabetList = (props) => {
-      const letters = props.letters;
-      let disableButton = ( this.state.word.length === this.state.usedLetters.length || this.state.errors > 10 || this.state.start);
-      const listLetters = letters.map((letter) => {
-      if(this.state.usedLetters.includes(letter)){
-        return <Button className="bouton" disabled={disableButton} onClick={() => {this.handleAlphabetClick([letter])}}>{letter}</Button>
-      } else return <Button disabled={disableButton} onClick={() => {this.handleAlphabetClick([letter])}}>{letter}</Button>
-      });
-      return (
-      <ul>{listLetters}</ul>
-      );
-      
+    const PenduJ1 = () => {
+      return <Canvas errors={this.state.errorsJ1}/> 
+    }
+
+    const PenduJ2 = () => {
+      return <Canvas errors={this.state.errorsJ2}/> 
     }
 
     const Results = () => {
-      if(this.state.errors > 10){
-        return <p>{"Looser"}</p>
+      if(this.state.errorsJ1 > 9){
+        return <p>{"Le joueur 1 est un looser"}</p>
+      }
+      if(this.state.errorsJ2 > 9){
+        return <p>{"Le joueur 2 est un looser"}</p>
       }
       if(this.state.word.length === this.state.usedLetters.length){
-        return <p>{"Winner"}</p>
+        if(this.state.currentPlayer === "Joueur 1"){
+          return <p>{"Le joueur 1 est un winner"}</p>
+        } else return <p>{"Le joueur 2 est un winner"}</p>
       }
+  
       return <p></p>
     }
 
     
     return (
       <React.Fragment>
-        <GameManager/>
-        <ScoreBoard/>
         <div>
+          <PenduJ1/>
+          <PenduJ2/>
+        </div>
+        <div>
+          <GameManager/>
+          <ScoreBoard/>
           <Results/>
           <GuessList/>
         </div>
         <div>
-          <AlphabetList letters={this.state.alphabet}/>
-          {console.log("mot " + this.state.word)}
-          {console.log("ul " + this.state.usedLetters)}
-          {console.log("l mot " + this.state.word.length)}
-          {console.log("l ul " + this.state.usedLetters.length)}
-          {console.log("iiii", this.state.wordList2)}
+          <input ref={(input) => {this.letterInput = input;}} onChange={this.handleChange} value=""/>
         </div>
       </React.Fragment>                          
     );
